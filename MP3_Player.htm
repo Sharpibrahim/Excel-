@@ -1,0 +1,280 @@
+<!doctype html>
+<!--
+<htmlApplication
+  applicationName="MP3 Player"
+  fixedSize="no"
+  width=900
+  height=500
+  menu="no" />
+-->
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<link rel="stylesheet" type="text/css" href="mp3.css">
+<script type="text/javascript">
+var path;
+var playingpath;
+var playingtrack;
+function getpausesvg()
+{
+  return '<svg style=\"vertical-align: middle\" id="play-icon" height="25" width="25" viewBox="0 0 1200 1200">  <path d="M 600,0 C 268.62914,0 0,268.62914 0,600 c 0,331.37086 268.62914,600 600,600 331.37086,0 600,-268.62914 600,-600 C 1200,268.62914 931.37086,0 600,0 z m -269.16515,289.38 181.71397,0 0,621.24 -181.71397,0 0,-621.24 z m 356.61633,0 181.71399,0 0,621.24 -181.71399,0 0,-621.24 z" /></svg>';
+}
+function getplaysvg()
+{
+  return '<svg style=\"vertical-align: middle\" id="play-icon" height="25" width="25" viewBox="0 0 1200 1200">  <path d="M 600,1200 C 268.65,1200 0,931.35 0,600 0,268.65 268.65,0 600,0 c 331.35,0 600,268.65 600,600 0,331.35 -268.65,600 -600,600 z M 450,300.45 450,899.55 900,600 450,300.45 z" id="path16995" /></svg>';
+}
+
+function togglepause()
+{
+  var p =document.getElementById("pause");
+  var a =document.getElementById("myaudio");
+  if(a.paused)
+  {
+    p.innerHTML = getpausesvg();
+    a.play();
+  }
+  else
+  {
+    p.innerHTML = getplaysvg();
+    a.pause();
+  }
+}
+function play(f,s)
+{
+  if(f=='')
+    track = path;
+  else
+    track = f;
+  
+  track += "\\";
+  track += s;
+
+  var a =document.getElementById("myaudio");
+  a.src=track;
+  a.play();
+  
+  var playing =document.getElementById("playing");
+  playing.innerHTML = "<span onclick=\"togglepause()\"><a id=\"pause\" href='#' style=\"vertical-align: middle\">" + getpausesvg() + "</a></span>&ensp;<span style=\"vertical-align: middle\" onclick=\"browsedirect(playingpath)\"><a href='#'>" + s + "</a></span>";
+  playing.title = track;
+  playingpath=path;
+  playingtrack=s;
+}
+
+function resize()
+{
+  document.getElementById("list").style.height=(window.innerHeight-document.getElementById("header").offsetHeight) + "px";
+}
+
+
+function clickprogress(e)
+{
+   var p =document.getElementById("progress");
+
+   var x = e.pageX - p.offsetLeft;
+   var clickedValue = x / p.offsetWidth;
+   
+   var a =document.getElementById("myaudio");
+   a.currentTime = clickedValue * a.duration;
+}
+
+function mytimeupdate()
+{
+  var a =document.getElementById("myaudio");
+
+  var progress =document.getElementById("progress");
+  progress.value = a.currentTime *100 / a.duration;
+}
+
+function ontrackend()
+{
+  var progress =document.getElementById("progress");
+  progress.value = 0;
+  
+  var fso=new ActiveXObject("scripting.filesystemobject");
+  var folder = fso.GetFolder(playingpath);
+
+  fc = new Enumerator(folder.Files); 
+  
+  for (; !fc.atEnd(); fc.moveNext()) 
+  { 
+    if(fc.item().Name==playingtrack)
+    {
+      while(true)
+      {
+        fc.moveNext();
+        if(fc.atEnd())
+          break;
+        
+
+        var posdot = fc.item().Name.lastIndexOf(".");
+        var extension=fc.item().Name.substring(posdot).toLowerCase() ;
+        if(extension=='.mp3')
+        {
+          play(playingpath,fc.item().Name);
+          return;
+        }
+      }
+    }
+  }
+}
+
+function browse(s)
+{
+  path += "\\";
+  path += s;
+  
+  folder();
+}
+function browsedirect(s)
+{
+  path = s;
+  
+  folder();
+}
+function onunload()
+{
+  var shell=new ActiveXObject("wscript.shell");
+  shell.RegWrite("HKCU\\Software\\HtmlApplicationByVbsedit\\MP3_Player\\Audio\\currentpath",path);
+}
+function onload()
+{
+  var shell=new ActiveXObject("wscript.shell");
+    
+  var a =document.getElementById("myaudio");
+  //alert(a.offsetWidth + " " + a.offsetHeight);
+  //window.resizeTo(300,500);
+
+  document.getElementById('progress').addEventListener('click', function (e) { clickprogress(e);});
+
+  path=""
+  try {
+    path=shell.RegRead("HKCU\\Software\\HtmlApplicationByVbsedit\\MP3_Player\\Audio\\currentpath");
+  }
+  catch(e)  {
+    //alert(e);
+  }
+  folder();
+}
+
+function drives()
+{
+  var fso=new ActiveXObject("scripting.filesystemobject");
+  fc = new Enumerator(fso.Drives);
+  s = ""; 
+  for (; !fc.atEnd(); fc.moveNext()) 
+  { 
+      if(fc.item().IsReady)
+        s += "<div class=\"drive\" onclick=\"browsedirect('" + fc.item().Path + "\\\\')\"><a href='#'>" + fc.item().Path + "</a></div>"; 
+  }
+  
+  var objShell=new ActiveXObject("Shell.Application");
+    
+  var specials = [0xd,0x35,0x05,0x2e];
+  for (var i = 0; i < specials.length; i++) 
+  {
+      var objFolder = objShell.Namespace(specials[i]);
+      var objFolderItem = objFolder.Self;
+      var objFolderPath = objFolderItem.Path;
+      objFolderPath = objFolderPath.replace(/\\/g,"\\\\");
+      
+      s += "<div class=\"drive\" onclick=\"browsedirect('" + objFolderPath + "')\"><a href='#'>" + objFolderItem.Name + "</a></div>"; 
+    }
+    
+  document.getElementById("list").innerHTML=s;
+  
+  resize();
+  
+}
+function folder()
+{
+  if(path=='')
+  {
+    a="Computer";
+  }
+  else
+  {
+    arr=path.split("\\");
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] == '') {         
+        arr.splice(i, 1);
+        i--;
+      }
+    }
+  
+    last =arr.pop();
+    path2="";
+    a="<span onclick=\"browsedirect('')\"><a href='#'>Computer</a></span>&ensp;<span'>&gt;</span>&ensp;";
+    arr.forEach(function(value){
+    
+      if(value!='')
+      {    
+        path2+=value;
+        path2+="\\\\";
+           
+        a += "<span onclick=\"browsedirect('" + path2.replace(/\'/g,'\\\'') + "')\"><a href='#'>" + value + "</a></span>&ensp;<span>&gt;</span>&ensp;";
+      }
+    });
+
+    a += last;
+  }
+
+  s = "<div class=\"drive\">" + a + "</div>"; 
+  
+  document.getElementById("location").innerHTML=s;
+  
+  s=""
+  
+  var fso=new ActiveXObject("scripting.filesystemobject");
+ 
+  if(path=='')
+  {
+    drives();
+    return;
+  }
+  else
+  {
+    var folder = fso.GetFolder(path);
+
+    fc = new Enumerator(folder.Subfolders); 
+  
+    for (; !fc.atEnd(); fc.moveNext()) 
+    {       
+      s += "<div class=\"drive\" onclick=\"browse('" + fc.item().Name.replace(/\'/g,'\\\'') + "')\"><a href='#'>" + fc.item().Name + "</a></div>"; 
+    }
+  
+    fc = new Enumerator(folder.Files); 
+  
+    for (; !fc.atEnd(); fc.moveNext()) 
+    { 
+      var posdot = fc.item().Name.lastIndexOf(".");
+      if(posdot>=0)
+      {       
+        var extension=fc.item().Name.substring(posdot).toLowerCase() ;
+        if(extension=='.mp3')
+          s += "<div class=\"drive\" onclick=\"play('','" + fc.item().Name.replace(/\'/g,'\\\'') + "')\"><a href='#'>" + fc.item().Name + "</a></div>"; 
+      }
+    }
+  }
+
+  document.getElementById("list").innerHTML=s;
+  
+  resize();
+}
+</script>
+</head>
+<body onunload="onunload()" onload="onload()" onresize="resize()">
+<div id="header">
+<div class="playing" id="playing"></div>
+<progress id="progress" value="0" max="100"></progress>
+<div class="header" id="location"></div>
+</div>
+<div id="content1" class="contents1">
+  <div id="list" class="contents2">
+  content
+  </div>
+</div>
+<audio style="display:none" id="myaudio" onended="ontrackend()" ontimeupdate="mytimeupdate()">
+Your browser does not support the audio element.
+</audio>
+</body>
+</html>
